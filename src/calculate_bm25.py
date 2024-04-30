@@ -11,6 +11,7 @@ nltk.download('stopwords')
 from nltk.stem import PorterStemmer
 ps = PorterStemmer()
 import numpy as np
+import time
 from collections import Counter
 
 def process_text(text):
@@ -39,8 +40,6 @@ def doc_length_bm25(words, query_tf, tf, M, doc_freq_words, doc_len, avgdl, b, k
 # getting the relevance of the documents using the information from the inverted index and the queries
 def main(inverted_index_path, vocabulary_path, queries_path):
     # Deserialize the JSON strings back into Python objects
-    print(inverted_index_path, vocabulary_path, queries_path)
-
     # use relative path to the file
     with open(inverted_index_path, 'r') as f:
         inverted_index = json.load(f)
@@ -66,6 +65,7 @@ def main(inverted_index_path, vocabulary_path, queries_path):
     if not os.path.exists("outputs"):
         os.makedirs("outputs")
 
+    start_time = time.time()
     for query in queries:
         query_words = process_text(query)
         query_tf = Counter(query_words)
@@ -83,9 +83,11 @@ def main(inverted_index_path, vocabulary_path, queries_path):
             f.write(f"Query: {query}\n")
             for docId, relevance in doc_relevances.items():
                 f.write(f"{docId}\t{relevance}\n")
-        return doc_relevances
 
-        
+        end_time = time.time() 
+        retrieval_time = end_time - start_time 
+        print("The time taken to retrieve relevant documents using BM25 is ", retrieval_time, " s")
+        return doc_relevances
 
 if __name__ == "__main__":
     inverted_index_path = sys.argv[1]

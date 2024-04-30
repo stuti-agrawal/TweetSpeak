@@ -22,18 +22,10 @@ with open('../results/query.json', 'w') as f:
 
 # get relevant tweet ids using BM25
 relevant_tweets = bm25('../results/inverted_index_web.json', '../results/vocabulary_web.json', '../results/query.json')
+
 if len(relevant_tweets) == 0:
     print("No relevant tweets found")
     exit()
-
-# calculate estimated overall sentiment
-overall_sentiment_score = 0
-for tweet_id in relevant_tweets:
-    if tweets[tweet_id]["sentiment"] == "Positive":
-        overall_sentiment_score += 1
-    elif tweets[tweet_id]["sentiment"] == "Negative":
-        overall_sentiment_score -= 1
-print("Estimated overall sentiment: ", "Positive" if overall_sentiment_score > 0 else "Negative")
 
 # tweets_score_list = []
 # overall_sentiment = 0
@@ -59,25 +51,43 @@ def print_top_tweets(positive_tweets_score_list, negative_tweets_score_list, ove
     print("\n")
 
     print("Top 5 positive tweets:")
-    for i in range(5):
+    for i in range(10):
         print(tweets[positive_tweets_score_list[i][0]]["tweet"])
 
     print("\n")
 
     print("Top 5 negative tweets:")
-    for i in range(5):
+    for i in range(10):
         print(tweets[negative_tweets_score_list[i][0]]["tweet"])
 
     print("\n")
 
+from ibm_watson import NaturalLanguageUnderstandingV1
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+import json
+from ibm_watson import NaturalLanguageUnderstandingV1
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_watson.natural_language_understanding_v1 import Features, SentimentOptions
+import time
+import numpy as np
+
+authenticator = IAMAuthenticator('api-key')
+natural_language_understanding = NaturalLanguageUnderstandingV1(
+    version='2022-04-07',
+    authenticator=authenticator)
+
+natural_language_understanding.set_service_url('url')
 # Example function to analyze sentiment
-def analyze_sentiment_transformers(text):
+def analyze_sentiment_ibm(text):
     start_time = time.time()
-    response = nlp(text)
+    response = natural_language_understanding.analyze(
+        text=text,
+        features=Features(sentiment=SentimentOptions())
+    ).get_result()
     end_time = time.time()
     response_time = end_time - start_time
-    sentiment = response[0]['label'] = response[0]['label'].lower()
-    confidence = response[0]['score']
+    sentiment = response['sentiment']['document']['label']
+    confidence = response['sentiment']['document']['score']
     return sentiment, confidence, response_time
 
 predicted_sentiment = []
@@ -92,17 +102,17 @@ for tweet_id in relevant_tweets:
     if tweets[tweet_id]["sentiment"] != "Positive" and tweets[tweet_id]["sentiment"] != "Negative" and tweets[tweet_id]["sentiment"] != "Neutral":
         continue
     tweet = tweets[tweet_id]["tweet"]
-    sentiment, confidence, response_time = analyze_sentiment_transformers(tweet)
+    sentiment, confidence, response_time = analyze_sentiment_ibm(tweet)
     response_times.append(response_time)
-    predicted_sentiment.append(sentiment.lower())
+    sentiment = sentiment.lower()
+    predicted_sentiment.append(sentiment)
     actual_sentiment.append(tweets[tweet_id]["sentiment"].lower())
     if sentiment == "positive":
         positive_tweets_score_list.append((tweet_id, confidence))
         overall_sentiment_score += confidence
-    else:
+    elif sentiment == "negative":
         negative_tweets_score_list.append((tweet_id, confidence))
         overall_sentiment_score -= confidence
 
 calculate_metrics(actual_sentiment, predicted_sentiment, response_times)
 print_top_tweets(positive_tweets_score_list, negative_tweets_score_list, overall_sentiment_score)
-
